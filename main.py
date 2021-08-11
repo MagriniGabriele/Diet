@@ -170,7 +170,7 @@ for x in range(food['Descrizione'].size):
 # Model
 m = gp.Model("diet")
 
-# Create decision variables for the foods to buy
+# Variabile di decisione acquisto del cibo
 buy = m.addVars(food['Descrizione'], name="buy")
 
 s = {
@@ -200,6 +200,10 @@ for c in categories:
         nutritionValues[f, c] = str(nutritionValues[f, c]).replace(',', '.')
     idealNutrition[c] = str(idealNutrition[c]).replace(',', '.')
 
+#trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
+#portare la funzione obiettivo nella forma PL come pianificato nel paper.
+
+
 for c in categories:
    x = float(sum(float(nutritionValues[f, c])*float(
        buy[f]) for f in food['Descrizione']) - float(idealNutrition[c]))
@@ -216,18 +220,12 @@ for c in categories:
 #    s[c] >= -(gp.quicksum(float(nutritionValues[f, c]) for f in food['Descrizione']) - float(idealNutrition[c])) for c
 #    in categories)
 
-# The objective is to minimize the costs
+#Funzione obiettivo
 m.setObjective(gp.quicksum(s[j] for j in categories), GRB.MINIMIZE)
 
-# Using looping constructs, the preceding statement would be:
-#
-# m.setObjective(sum(buy[f]*cost[f] for f in foods), GRB.MINIMIZE)
 
-# Nutrition constraints
+# Aggiunta bound nutrizionali
 
-
-# Using looping constructs, the preceding statement would be:
-#
 # for c in categories:
 #  m.addRange(sum(nutritionValues[f, c] * buy[f] for f in foods),
 #             minNutrition[c], maxNutrition[c], c)
