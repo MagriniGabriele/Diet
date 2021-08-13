@@ -194,41 +194,48 @@ s = {
     'VitD': 0
 }
 
-
 for c in categories:
     for f in food['Descrizione']:
         nutritionValues[f, c] = str(nutritionValues[f, c]).replace(',', '.')
     idealNutrition[c] = str(idealNutrition[c]).replace(',', '.')
+    minNutrition[c] = str(minNutrition[c]).replace(',', '.')
+    maxNutrition[c] = str(maxNutrition[c]).replace(',', '.')
+    minNutrition[c] = str(minNutrition[c]).replace('ND(0)', '0')
+    minNutrition[c] = str(minNutrition[c]).replace('ND(inf)', '10000')
+    maxNutrition[c] = str(maxNutrition[c]).replace('ND(0)', '0')
+    maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)', '10000')
 
-#trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
-#portare la funzione obiettivo nella forma PL come pianificato nel paper.
+# trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
+# portare la funzione obiettivo nella forma PL come pianificato nel paper.
+m.update()
+print(buy)
+#for c in categories:
+#    x = (sum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(idealNutrition[c]))
+#    print(x)
+#    if x > 0:
+#        s[c] = x
+#    else:
+#        s[c] = -x
 
+m.addConstrs(
+    s[c] >= (gp.quicksum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(
+        idealNutrition[c])) for c in
+    categories)
+m.addConstrs(
+    s[c] >= -(gp.quicksum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(
+        idealNutrition[c])) for c
+    in categories)
 
-for c in categories:
-   x = float(sum(float(nutritionValues[f, c])*float(
-       buy[f]) for f in food['Descrizione']) - float(idealNutrition[c]))
-   print(x)
-   if x > 0:
-     s[c] = x
-   else:
-       s[c] = -x
+m.addConstrs(buy[f] >= 0 for f in food['Descrizione'])
 
-#m.addConstrs(
-#    s[c] >= (gp.quicksum(float(nutritionValues[f, c]) for f in food['Descrizione']) - float(idealNutrition[c])) for c in
-#    categories)
-#m.addConstrs(
-#    s[c] >= -(gp.quicksum(float(nutritionValues[f, c]) for f in food['Descrizione']) - float(idealNutrition[c])) for c
-#    in categories)
-
-#Funzione obiettivo
+# Funzione obiettivo
 m.setObjective(gp.quicksum(s[j] for j in categories), GRB.MINIMIZE)
-
 
 # Aggiunta bound nutrizionali
 
-# for c in categories:
-#  m.addRange(sum(nutritionValues[f, c] * buy[f] for f in foods),
-#             minNutrition[c], maxNutrition[c], c)
+for c in categories:
+    m.addRange(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']),
+               float(minNutrition[c]), float(maxNutrition[c]), c)
 
 
 def printSolution():
