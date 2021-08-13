@@ -70,6 +70,9 @@ def mbCalculus(a, s, w):
 # Caricamento tabella cibi
 
 food = pd.read_csv("data/Food-Tab-Ult.csv", delimiter=";")
+#foods = set(food['Descrizione'])
+#foods = sorted(foods)
+#print(foods)
 
 # Input sesso, età, peso e attività fisica
 
@@ -123,8 +126,8 @@ print(food['Descrizione'][0])
 
 categories, minNutrition, maxNutrition, idealNutrition = gp.multidict({
     'Calories': [minCalories, maxCalories, idCalories],
-    'Protein': [protMin, protMax, protId],
-    'Fat': [0, 65, 102],
+    #'Protein': [protMin, protMax, protId],
+    #'Fat': [0, 65, 102],
     'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
     'Calcium': [data['minCalcium'][age], data['maxCalcium'][age], data['idCalcium'][age]],
     'Sodium': [data['minSodium'][age], data['maxSodium'][age], data['idSodium'][age]],
@@ -147,8 +150,8 @@ nutritionValues = {}
 for x in range(food['Descrizione'].size):
     b = {
         (food['Descrizione'][x], 'Calories'): food['Calories'][x],
-        (food['Descrizione'][x], 'Protein'): food['Proteins'][x],
-        (food['Descrizione'][x], 'Fat'): food['Fat'][x],
+        #(food['Descrizione'][x], 'Protein'): food['Proteins'][x],
+        #(food['Descrizione'][x], 'Fat'): food['Fat'][x],
         (food['Descrizione'][x], 'Iron'): food['Iron'][x],
         (food['Descrizione'][x], 'Calcium'): food['Calcium'][x],
         (food['Descrizione'][x], 'Sodium'): food['Sodium'][x],
@@ -173,26 +176,7 @@ m = gp.Model("diet")
 # Variabile di decisione acquisto del cibo
 buy = m.addVars(food['Descrizione'], name="buy")
 
-s = {
-    'Calories': 0,
-    'Protein': 0,
-    'Fat': 0,
-    'Iron': 0,
-    'Calcium': 0,
-    'Sodium': 0,
-    'Potassium': 0,
-    'Phosphorus': 0,
-    'Zinc': 0,
-    'Thiamine': 0,
-    'Riboflavin': 0,
-    'Niacine': 0,
-    'VitC': 0,
-    'VitB6': 0,
-    'VitB9': 0,
-    'VitA': 0,
-    'VitE': 0,
-    'VitD': 0
-}
+s = m.addVars(categories, name="s")
 
 for c in categories:
     for f in food['Descrizione']:
@@ -209,13 +193,10 @@ for c in categories:
 # portare la funzione obiettivo nella forma PL come pianificato nel paper.
 m.update()
 print(buy)
+
 #for c in categories:
 #    x = (sum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(idealNutrition[c]))
-#    print(x)
-#    if x > 0:
-#        s[c] = x
-#    else:
-#        s[c] = -x
+#    s.append(abs(x))
 
 m.addConstrs(
     s[c] >= (gp.quicksum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(
@@ -223,8 +204,8 @@ m.addConstrs(
     categories)
 m.addConstrs(
     s[c] >= -(gp.quicksum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(
-        idealNutrition[c])) for c
-    in categories)
+        idealNutrition[c])) for c in
+    categories)
 
 m.addConstrs(buy[f] >= 0 for f in food['Descrizione'])
 
