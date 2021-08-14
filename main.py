@@ -70,9 +70,9 @@ def mbCalculus(a, s, w):
 # Caricamento tabella cibi
 
 food = pd.read_csv("data/Food-Tab-Ult.csv", delimiter=";")
-#foods = set(food['Descrizione'])
-#foods = sorted(foods)
-#print(foods)
+# foods = set(food['Descrizione'])
+# foods = sorted(foods)
+# print(foods)
 
 # Input sesso, età, peso e attività fisica
 
@@ -103,14 +103,15 @@ elif choice == 4:
 # Calcolo bounds calorici
 
 minCalories = mbCalculus(age, sex, weight)
-idCalories = maxCalories = minCalories * LAF
+idCalories = (minCalories * LAF)
+maxCalories = idCalories + (20 % idCalories)
 
 # Caricamento tabella bounds
 
 if sex == 'm' or sex == 'M':
     data = pd.read_csv("data/nutrientBoundMale.csv", delimiter=";")
 else:
-    data = pd.read_csv("data/nutrientBoundFemale.tsv", delimiter=";")
+    data = pd.read_csv("data/nutrientBoundFemale.csv", delimiter=";")
 
 # Calcolo bounds proteine
 
@@ -126,9 +127,9 @@ print(food['Descrizione'][0])
 
 categories, minNutrition, maxNutrition, idealNutrition = gp.multidict({
     'Calories': [minCalories, maxCalories, idCalories],
-    #'Protein': [protMin, protMax, protId],
-    #'Fat': [0, 65, 102],
-    'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
+    # 'Protein': [protMin, protMax, protId],
+    # 'Fat': [0, 65, 102],
+    # 'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
     'Calcium': [data['minCalcium'][age], data['maxCalcium'][age], data['idCalcium'][age]],
     'Sodium': [data['minSodium'][age], data['maxSodium'][age], data['idSodium'][age]],
     'Potassium': [data['minPotassium'][age], data['maxPotassium'][age], data['idPotassium'][age]],
@@ -150,9 +151,9 @@ nutritionValues = {}
 for x in range(food['Descrizione'].size):
     b = {
         (food['Descrizione'][x], 'Calories'): food['Calories'][x],
-        #(food['Descrizione'][x], 'Protein'): food['Proteins'][x],
-        #(food['Descrizione'][x], 'Fat'): food['Fat'][x],
-        (food['Descrizione'][x], 'Iron'): food['Iron'][x],
+        # (food['Descrizione'][x], 'Protein'): food['Proteins'][x],
+        # (food['Descrizione'][x], 'Fat'): food['Fat'][x],
+        # (food['Descrizione'][x], 'Iron'): food['Iron'][x],
         (food['Descrizione'][x], 'Calcium'): food['Calcium'][x],
         (food['Descrizione'][x], 'Sodium'): food['Sodium'][x],
         (food['Descrizione'][x], 'Potassium'): food['Potassium'][x],
@@ -185,16 +186,16 @@ for c in categories:
     minNutrition[c] = str(minNutrition[c]).replace(',', '.')
     maxNutrition[c] = str(maxNutrition[c]).replace(',', '.')
     minNutrition[c] = str(minNutrition[c]).replace('ND(0)', '0')
-    minNutrition[c] = str(minNutrition[c]).replace('ND(inf)', '10000')
+    minNutrition[c] = str(minNutrition[c]).replace('ND(inf)', '1000000')
     maxNutrition[c] = str(maxNutrition[c]).replace('ND(0)', '0')
-    maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)', '10000')
+    maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)', '1000000')
 
 # trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
 # portare la funzione obiettivo nella forma PL come pianificato nel paper.
 m.update()
 print(buy)
 
-#for c in categories:
+# for c in categories:
 #    x = (sum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(idealNutrition[c]))
 #    s.append(abs(x))
 
@@ -220,12 +221,36 @@ for c in categories:
 
 
 def printSolution():
+    sum = {
+        'Calories': 0,
+        # 'Protein': [protMin, protMax, protId],
+        # 'Fat': [0, 65, 102],
+        # 'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
+        'Calcium': 0,
+        'Sodium': 0,
+        'Potassium': 0,
+        'Phosphorus': 0,
+        'Zinc': 0,
+        'Thiamine': 0,
+        'Riboflavin': 0,
+        'Niacine': 0,
+        'VitC': 0,
+        'VitB6': 0,
+        'VitB9': 0,
+        'VitA': 0,
+        'VitE': 0,
+        'VitD': 0
+    }
     if m.status == GRB.OPTIMAL:
         print('\nCost: %g' % m.objVal)
         print('\nBuy:')
         for f in food['Descrizione']:
             if buy[f].x > 0.0001:
+                for c in categories:
+                    sum[c] += float(nutritionValues[f,c])*buy[f].x
                 print('%s %g' % (f, buy[f].x))
+        print('Categories: %s' % sum)
+
     else:
         print('No solution')
 
