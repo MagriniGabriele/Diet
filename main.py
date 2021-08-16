@@ -127,9 +127,9 @@ print(food['Descrizione'][0])
 
 categories, minNutrition, maxNutrition, idealNutrition = gp.multidict({
     'Calories': [minCalories, maxCalories, idCalories],
-    # 'Protein': [protMin, protMax, protId],
-    # 'Fat': [0, 65, 102],
-    # 'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
+    'Protein': [protMin, protMax, protId],
+    #'Fat': [0, 65, 102],
+    'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
     'Calcium': [data['minCalcium'][age], data['maxCalcium'][age], data['idCalcium'][age]],
     'Sodium': [data['minSodium'][age], data['maxSodium'][age], data['idSodium'][age]],
     'Potassium': [data['minPotassium'][age], data['maxPotassium'][age], data['idPotassium'][age]],
@@ -151,9 +151,10 @@ nutritionValues = {}
 for x in range(food['Descrizione'].size):
     b = {
         (food['Descrizione'][x], 'Calories'): food['Calories'][x],
-        # (food['Descrizione'][x], 'Protein'): food['Proteins'][x],
-        # (food['Descrizione'][x], 'Fat'): food['Fat'][x],
-        # (food['Descrizione'][x], 'Iron'): food['Iron'][x],
+        (food['Descrizione'][x], 'Tipo'): food['Tipo'][x],
+        (food['Descrizione'][x], 'Protein'): food['Proteins'][x],
+        #(food['Descrizione'][x], 'Fat'): food['Fat'][x],
+        (food['Descrizione'][x], 'Iron'): food['Iron'][x],
         (food['Descrizione'][x], 'Calcium'): food['Calcium'][x],
         (food['Descrizione'][x], 'Sodium'): food['Sodium'][x],
         (food['Descrizione'][x], 'Potassium'): food['Potassium'][x],
@@ -208,7 +209,16 @@ m.addConstrs(
         idealNutrition[c])) for c in
     categories)
 
+# Limito le porzioni
 m.addConstrs(buy[f] >= 0 for f in food['Descrizione'])
+m.addConstrs(buy[f] <= 3 for f in food['Descrizione'])
+
+# Tolgo le bevande
+m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'D'))
+
+# Forzo degli alimenti
+m.addConstr(buy['PASTA DI SEMOLA INTEGRALE     '] >= 1)
+
 
 # Funzione obiettivo
 m.setObjective(gp.quicksum(s[j] for j in categories), GRB.MINIMIZE)
@@ -223,9 +233,9 @@ for c in categories:
 def printSolution():
     sum = {
         'Calories': 0,
-        # 'Protein': [protMin, protMax, protId],
-        # 'Fat': [0, 65, 102],
-        # 'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
+        'Protein': 0,
+        #'Fat': 0,
+        'Iron': 0,
         'Calcium': 0,
         'Sodium': 0,
         'Potassium': 0,
@@ -255,6 +265,11 @@ def printSolution():
         print('No solution')
 
 
-# Solve
+# Risoluzione
+m.optimize()
+printSolution()
+
+# Rilasso vincoli se infeasible
+m.feasRelaxS(0, False, False, True)
 m.optimize()
 printSolution()
