@@ -189,7 +189,7 @@ for c in categories:
     minNutrition[c] = str(minNutrition[c]).replace('ND(0)', '0')
     minNutrition[c] = str(minNutrition[c]).replace('ND(inf)', '1000000')
     maxNutrition[c] = str(maxNutrition[c]).replace('ND(0)', '0')
-    maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)', '1000000')
+    maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)', str(float(minNutrition[c]) + 100 % float(minNutrition[c])))
 
 # trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
 # portare la funzione obiettivo nella forma PL come pianificato nel paper.
@@ -217,7 +217,7 @@ m.addConstrs(buy[f] <= 3 for f in food['Descrizione'])
 m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'D'))
 
 # Forzo degli alimenti
-m.addConstr(buy['PASTA DI SEMOLA INTEGRALE     '] >= 1)
+m.addConstr(buy['PASTA DI SEMOLA INTEGRALE     '] >= 0.8)
 
 
 # Funzione obiettivo
@@ -225,9 +225,16 @@ m.setObjective(gp.quicksum(s[j] for j in categories), GRB.MINIMIZE)
 
 # Aggiunta bound nutrizionali
 
+#for c in categories:
+#    m.addRange(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']),
+#               float(minNutrition[c]), float(maxNutrition[c]), c)
+
 for c in categories:
-    m.addRange(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']),
-               float(minNutrition[c]), float(maxNutrition[c]), c)
+    m.addConstr(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']) >=
+               float(minNutrition[c]), c)
+    m.addConstr(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']) <=
+                float(maxNutrition[c]), c)
+
 
 
 def printSolution():
@@ -270,6 +277,6 @@ m.optimize()
 printSolution()
 
 # Rilasso vincoli se infeasible
-m.feasRelaxS(0, False, False, True)
+m.feasRelaxS(0, True, False, True)
 m.optimize()
 printSolution()
