@@ -106,6 +106,8 @@ minCalories = mbCalculus(age, sex, weight)
 idCalories = (minCalories * LAF)
 maxCalories = idCalories + (20 % idCalories)
 
+print("Calories Objective: ", idCalories)
+
 # Caricamento tabella bounds
 
 if sex == 'm' or sex == 'M':
@@ -128,7 +130,7 @@ print(food['Descrizione'][0])
 categories, minNutrition, maxNutrition, idealNutrition = gp.multidict({
     'Calories': [minCalories, maxCalories, idCalories],
     'Protein': [protMin, protMax, protId],
-    #'Fat': [0, 65, 102],
+    # 'Fat': [0, 65, 102],
     'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
     'Calcium': [data['minCalcium'][age], data['maxCalcium'][age], data['idCalcium'][age]],
     'Sodium': [data['minSodium'][age], data['maxSodium'][age], data['idSodium'][age]],
@@ -153,7 +155,7 @@ for x in range(food['Descrizione'].size):
         (food['Descrizione'][x], 'Calories'): food['Calories'][x],
         (food['Descrizione'][x], 'Tipo'): food['Tipo'][x],
         (food['Descrizione'][x], 'Protein'): food['Proteins'][x],
-        #(food['Descrizione'][x], 'Fat'): food['Fat'][x],
+        # (food['Descrizione'][x], 'Fat'): food['Fat'][x],
         (food['Descrizione'][x], 'Iron'): food['Iron'][x],
         (food['Descrizione'][x], 'Calcium'): food['Calcium'][x],
         (food['Descrizione'][x], 'Sodium'): food['Sodium'][x],
@@ -189,7 +191,8 @@ for c in categories:
     minNutrition[c] = str(minNutrition[c]).replace('ND(0)', '0')
     minNutrition[c] = str(minNutrition[c]).replace('ND(inf)', '1000000')
     maxNutrition[c] = str(maxNutrition[c]).replace('ND(0)', '0')
-    maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)', str(float(minNutrition[c]) + 100 % float(minNutrition[c])))
+    maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)',
+                                                   str(float(minNutrition[c]) + 100 % float(minNutrition[c])))
 
 # trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
 # portare la funzione obiettivo nella forma PL come pianificato nel paper.
@@ -215,33 +218,33 @@ m.addConstrs(buy[f] <= 3 for f in food['Descrizione'])
 
 # Tolgo le bevande
 m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'D'))
+m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'FA'))
 
 # Forzo degli alimenti
-m.addConstr(buy['PASTA DI SEMOLA INTEGRALE     '] >= 0.8)
-
+m.addConstr(sum(buy[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'CR' or food['Tipo'][t] == 'PS')) == 1,
+            'Primo')
 
 # Funzione obiettivo
-m.setObjective(gp.quicksum(s[j] for j in categories), GRB.MINIMIZE)
+m.setObjective(gp.quicksum(s[j] for j in s), GRB.MINIMIZE)
 
 # Aggiunta bound nutrizionali
 
-#for c in categories:
+# for c in categories:
 #    m.addRange(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']),
 #               float(minNutrition[c]), float(maxNutrition[c]), c)
 
 for c in categories:
     m.addConstr(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']) >=
-               float(minNutrition[c]), c)
+                float(minNutrition[c]), c)
     m.addConstr(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']) <=
                 float(maxNutrition[c]), c)
-
 
 
 def printSolution():
     sum = {
         'Calories': 0,
         'Protein': 0,
-        #'Fat': 0,
+        # 'Fat': 0,
         'Iron': 0,
         'Calcium': 0,
         'Sodium': 0,
@@ -264,7 +267,7 @@ def printSolution():
         for f in food['Descrizione']:
             if buy[f].x > 0.0001:
                 for c in categories:
-                    sum[c] += float(nutritionValues[f,c])*buy[f].x
+                    sum[c] += float(nutritionValues[f, c]) * buy[f].x
                 print('%s %g' % (f, buy[f].x))
         print('Categories: %s' % sum)
 
@@ -277,6 +280,7 @@ m.optimize()
 printSolution()
 
 # Rilasso vincoli se infeasible
-m.feasRelaxS(0, True, False, True)
+m.feasRelaxS(0, False, False, True)
 m.optimize()
 printSolution()
+print(s)
