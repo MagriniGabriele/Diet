@@ -213,15 +213,16 @@ m.addConstrs(
     categories)
 
 # Limito le porzioni
-m.addConstrs(buy[f] >= 0 for f in food['Descrizione'])
+m.addConstrs(buy[f] >= 0.3 for f in food['Descrizione'])
 m.addConstrs(buy[f] <= 3 for f in food['Descrizione'])
 
-# Tolgo le bevande
+# Limito alimenti dannosi
 m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'D'))
 m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'FA'))
+m.addConstr(buy['BURRO        '] <= 0.3, 'Burro')
 
 # Forzo degli alimenti
-m.addConstr(sum(buy[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'CR' or food['Tipo'][t] == 'PS')) == 1,
+m.addConstr(sum(buy[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'CR' or food['Tipo'][t] == 'PS')) >= 0.8,
             'Primo')
 
 # Funzione obiettivo
