@@ -99,6 +99,8 @@ elif choice == 3:
     LAF = 1.75
 elif choice == 4:
     LAF = 2.10
+elif choice == 0:
+    LAF = 1
 
 # Calcolo bounds calorici
 
@@ -123,13 +125,12 @@ protMin, protMax, protId = proteinCalculus(age, sex)
 print(data)
 
 print(food)
-print(food['Descrizione'][0])
 
 # Creazione bounds nutrizionali
 
 categories, minNutrition, maxNutrition, idealNutrition = gp.multidict({
     'Calories': [minCalories, maxCalories, idCalories],
-    'Protein': [protMin, protMax, protId],
+    #'Protein': [protMin, protMax, protId],
     # 'Fat': [0, 65, 102],
     'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
     'Calcium': [data['minCalcium'][age], data['maxCalcium'][age], data['idCalcium'][age]],
@@ -154,7 +155,7 @@ for x in range(food['Descrizione'].size):
     b = {
         (food['Descrizione'][x], 'Calories'): food['Calories'][x],
         (food['Descrizione'][x], 'Tipo'): food['Tipo'][x],
-        (food['Descrizione'][x], 'Protein'): food['Proteins'][x],
+        #(food['Descrizione'][x], 'Protein'): food['Proteins'][x],
         # (food['Descrizione'][x], 'Fat'): food['Fat'][x],
         (food['Descrizione'][x], 'Iron'): food['Iron'][x],
         (food['Descrizione'][x], 'Calcium'): food['Calcium'][x],
@@ -179,6 +180,15 @@ m = gp.Model("diet")
 
 # Variabile di decisione acquisto del cibo
 buy = m.addVars(food['Descrizione'], name="buy")
+preferences = m.addVars(food['Descrizione'], name="preferences")
+
+for i in preferences:
+    preferences[i] = 0
+
+preferences["BOVINO  MIDOLLO OSSEO      "] += 1
+preferences["PASTA DI SEMOLA      "] -= 1
+
+print(preferences)
 
 s = m.addVars(categories, name="s")
 
@@ -213,20 +223,15 @@ m.addConstrs(
     categories)
 
 # Limito le porzioni
-m.addConstrs(buy[f] >= 0.3 for f in food['Descrizione'])
-m.addConstrs(buy[f] <= 3 for f in food['Descrizione'])
+m.addConstrs(buy[f] <= 2.5 for f in food['Descrizione'])
 
 # Limito alimenti dannosi
 m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'D'))
-m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'FA'))
 m.addConstr(buy['BURRO        '] <= 0.3, 'Burro')
 
 # Forzo degli alimenti
-m.addConstr(sum(buy[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'CR' or food['Tipo'][t] == 'PS')) >= 0.8,
-            'Primo')
-
-# Funzione obiettivo
-m.setObjective(gp.quicksum(s[j] for j in s), GRB.MINIMIZE)
+# m.addConstr(sum(buy[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'CR' or food['Tipo'][t] == 'PS')) >= 0.8,
+#            'Primo')
 
 # Aggiunta bound nutrizionali
 
@@ -240,11 +245,16 @@ for c in categories:
     m.addConstr(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']) <=
                 float(maxNutrition[c]), c)
 
+# Funzione obiettivo
+# m.setObjective(gp.quicksum(s[j] for j in s), GRB.MINIMIZE)
+m.setObjective(gp.quicksum(s[j] for j in s)+gp.quicksum(buy[i]*preferences[i] for i in food['Descrizione']), GRB.MINIMIZE)
+
+
 
 def printSolution():
     sum = {
         'Calories': 0,
-        'Protein': 0,
+        # 'Protein': 0,
         # 'Fat': 0,
         'Iron': 0,
         'Calcium': 0,
@@ -269,7 +279,7 @@ def printSolution():
             if buy[f].x > 0.0001:
                 for c in categories:
                     sum[c] += float(nutritionValues[f, c]) * buy[f].x
-                print('%s %g' % (f, buy[f].x))
+                print('%s %g gr.' % (f, buy[f].x * 100))
         print('Categories: %s' % sum)
 
     else:
