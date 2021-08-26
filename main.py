@@ -119,8 +119,11 @@ else:
 
 # Calcolo bounds proteine
 
-
 protMin, protMax, protId = proteinCalculus(age, sex)
+
+#porzioni massime
+
+maxPortions = 2.5
 
 print(data)
 
@@ -180,12 +183,15 @@ m = gp.Model("diet")
 
 # Variabile di decisione acquisto del cibo
 buy = m.addVars(food['Descrizione'], name="buy")
+delta = m.addVars(food['Descrizione'], vtype=GRB.BINARY, name="delta")
 preferences = m.addVars(food['Descrizione'], name="preferences")
 
 for i in preferences:
     preferences[i] = 0
 
-preferences["BOVINO  MIDOLLO OSSEO      "] += 1
+preferences["PIZZA CON POMODORO      "] += 1
+preferences["PANNA 30% di lipidi     "] += 1
+preferences["PANNA 20% di lipidi (da cucina)   "] += 1
 preferences["PASTA DI SEMOLA      "] -= 1
 
 print(preferences)
@@ -207,7 +213,7 @@ for c in categories:
 # trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
 # portare la funzione obiettivo nella forma PL come pianificato nel paper.
 m.update()
-print(buy)
+print("AAAAAAAAAAAAAAAA",delta)
 
 # for c in categories:
 #    x = (sum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(idealNutrition[c]))
@@ -223,21 +229,15 @@ m.addConstrs(
     categories)
 
 # Limito le porzioni
-m.addConstrs(buy[f] <= 2.5 for f in food['Descrizione'])
+m.addConstrs(buy[f] <= maxPortions*delta[f] for f in food['Descrizione'])
+m.addConstrs(buy[f] >= delta[f]/3 for f in food['Descrizione'])
+
 
 # Limito alimenti dannosi
 m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'D'))
 m.addConstr(buy['BURRO        '] <= 0.3, 'Burro')
 
-# Forzo degli alimenti
-# m.addConstr(sum(buy[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'CR' or food['Tipo'][t] == 'PS')) >= 0.8,
-#            'Primo')
-
 # Aggiunta bound nutrizionali
-
-# for c in categories:
-#    m.addRange(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']),
-#               float(minNutrition[c]), float(maxNutrition[c]), c)
 
 for c in categories:
     m.addConstr(sum(nutritionValues[f, c] * buy[f] for f in food['Descrizione']) >=
@@ -246,8 +246,7 @@ for c in categories:
                 float(maxNutrition[c]), c)
 
 # Funzione obiettivo
-# m.setObjective(gp.quicksum(s[j] for j in s), GRB.MINIMIZE)
-m.setObjective(gp.quicksum(s[j] for j in s)+gp.quicksum(buy[i]*preferences[i] for i in food['Descrizione']), GRB.MINIMIZE)
+m.setObjective(gp.quicksum(s[j] for j in s)+gp.quicksum(delta[i]*preferences[i] for i in food['Descrizione']), GRB.MINIMIZE)
 
 
 
@@ -288,10 +287,7 @@ def printSolution():
 
 # Risoluzione
 m.optimize()
+if m.status != GRB.OPTIMAL:
+    m.feasRelaxS(0, False, False, True)
+    m.optimize()
 printSolution()
-
-# Rilasso vincoli se infeasible
-m.feasRelaxS(0, False, False, True)
-m.optimize()
-printSolution()
-print(s)
