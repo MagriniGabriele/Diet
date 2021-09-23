@@ -51,7 +51,7 @@ def mbCalculus(a, s, w):
             MB = 11.472 * w + 873.1
         elif a >= 60:
             MB = 11.711 * w + 587.7
-    else:
+    elif s == 'f' or s == 'F':
         if a < 3:
             MB = 58.317 * w - 31.1
         elif 3 <= a < 10:
@@ -70,9 +70,6 @@ def mbCalculus(a, s, w):
 # Caricamento tabella cibi
 
 food = pd.read_csv("data/Food-Tab-Ult.csv", delimiter=";")
-# foods = set(food['Descrizione'])
-# foods = sorted(foods)
-# print(foods)
 
 # Input sesso, età, peso e attività fisica
 
@@ -83,7 +80,7 @@ print('Enter your age:')
 age = int(input())
 
 print('Enter your weight:')
-weight = int(input())
+weight = float(input())
 
 print('Choose your level of activity: \n')
 print('1)Sedentary\n2)Moderate active\n3)Active\n4)Strongly active\n')
@@ -104,9 +101,9 @@ elif choice == 0:
 
 # Calcolo bounds calorici
 
-minCalories = mbCalculus(age, sex, weight)
-idCalories = (minCalories * LAF)
-maxCalories = idCalories + (20 % idCalories)
+minCalories = int(mbCalculus(age, sex, weight))
+idCalories = int((minCalories * LAF))
+maxCalories = int(idCalories + (20 % idCalories))
 
 print("Calories Objective: ", idCalories)
 
@@ -114,26 +111,30 @@ print("Calories Objective: ", idCalories)
 
 if sex == 'm' or sex == 'M':
     data = pd.read_csv("data/nutrientBoundMale.csv", delimiter=";")
-else:
+elif sex == 'f' or sex == 'F':
     data = pd.read_csv("data/nutrientBoundFemale.csv", delimiter=";")
 
 # Calcolo bounds proteine
-
 protMin, protMax, protId = proteinCalculus(age, sex)
+protMin = protMin*weight
+protMax = protMax*weight
+protId = protId*weight
 
-#porzioni massime
+# Calcolo bounds carboidrati
+minCarbo = ((idCalories*45)/100)/4.2
+idCarbo = ((idCalories*53)/100)/4.2
+maxCarbo = ((idCalories*60)/100)/4.2
+
+# porzioni massime
 
 maxPortions = 2.5
-
-print(data)
-
-print(food)
 
 # Creazione bounds nutrizionali
 
 categories, minNutrition, maxNutrition, idealNutrition = gp.multidict({
     'Calories': [minCalories, maxCalories, idCalories],
-    #'Protein': [protMin, protMax, protId],
+    'Protein': [protMin, protMax, protId],
+    #'Glucids': [minCarbo, maxCarbo, idCarbo],
     # 'Fat': [0, 65, 102],
     'Iron': [data['minIron'][age], data['maxIron'][age], data['idIron'][age]],
     'Calcium': [data['minCalcium'][age], data['maxCalcium'][age], data['idCalcium'][age]],
@@ -158,7 +159,8 @@ for x in range(food['Descrizione'].size):
     b = {
         (food['Descrizione'][x], 'Calories'): food['Calories'][x],
         (food['Descrizione'][x], 'Tipo'): food['Tipo'][x],
-        #(food['Descrizione'][x], 'Protein'): food['Proteins'][x],
+        (food['Descrizione'][x], 'Protein'): food['Proteins'][x],
+        #(food['Descrizione'][x], 'Glucids'): food['Glucids'][x],
         # (food['Descrizione'][x], 'Fat'): food['Fat'][x],
         (food['Descrizione'][x], 'Iron'): food['Iron'][x],
         (food['Descrizione'][x], 'Calcium'): food['Calcium'][x],
@@ -189,12 +191,8 @@ preferences = m.addVars(food['Descrizione'], name="preferences")
 for i in preferences:
     preferences[i] = 0
 
-preferences["PIZZA CON POMODORO      "] += 1
-preferences["PANNA 30% di lipidi     "] += 1
-preferences["PANNA 20% di lipidi (da cucina)   "] += 1
-preferences["PASTA DI SEMOLA      "] -= 1
+preferences["PASTA DI SEMOLA      "] -= 75
 
-print(preferences)
 
 s = m.addVars(categories, name="s")
 
@@ -210,14 +208,7 @@ for c in categories:
     maxNutrition[c] = str(maxNutrition[c]).replace('ND(inf)',
                                                    str(float(minNutrition[c]) + 100 % float(minNutrition[c])))
 
-# trasformazione della funzione obiettivo: soluzine temporanea in atesa di capire a pienno come usare Gurobi per
-# portare la funzione obiettivo nella forma PL come pianificato nel paper.
 m.update()
-print("AAAAAAAAAAAAAAAA",delta)
-
-# for c in categories:
-#    x = (sum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(idealNutrition[c]))
-#    s.append(abs(x))
 
 m.addConstrs(
     s[c] >= (gp.quicksum(float(nutritionValues[f, c]) * (buy[f]) for f in food['Descrizione']) - float(
@@ -231,11 +222,17 @@ m.addConstrs(
 # Limito le porzioni
 m.addConstrs(buy[f] <= maxPortions*delta[f] for f in food['Descrizione'])
 m.addConstrs(buy[f] >= delta[f]/3 for f in food['Descrizione'])
+m.addConstr(sum(delta[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'C' or food['Tipo'][t] == 'P')) <= 1)
+m.addConstr(sum(delta[f] for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'O') or food['Tipo'][t] == 'M') <= 1)
+
 
 
 # Limito alimenti dannosi
 m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'D'))
-m.addConstr(buy['BURRO        '] <= 0.3, 'Burro')
+m.addConstrs(buy[f] >=  delta[f]/1.25for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'PS'))
+m.addConstrs(buy[f] >= delta[f]*2 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'PI'))
+m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'DO'))
+m.addConstrs(buy[f] == 0 for t, f in enumerate(food['Descrizione']) if (food['Tipo'][t] == 'A'))
 
 # Aggiunta bound nutrizionali
 
@@ -246,14 +243,14 @@ for c in categories:
                 float(maxNutrition[c]), c)
 
 # Funzione obiettivo
-m.setObjective(gp.quicksum(s[j] for j in s)+gp.quicksum(delta[i]*preferences[i] for i in food['Descrizione']), GRB.MINIMIZE)
-
+m.setObjective(gp.quicksum(s[j] for j in s)+gp.quicksum(buy[i]*preferences[i] for i in food['Descrizione']), GRB.MINIMIZE)
 
 
 def printSolution():
-    sum = {
+    somma = {
         'Calories': 0,
-        # 'Protein': 0,
+        'Protein': 0,
+        #'Glucids': 0,
         # 'Fat': 0,
         'Iron': 0,
         'Calcium': 0,
@@ -277,17 +274,25 @@ def printSolution():
         for f in food['Descrizione']:
             if buy[f].x > 0.0001:
                 for c in categories:
-                    sum[c] += float(nutritionValues[f, c]) * buy[f].x
-                print('%s %g gr.' % (f, buy[f].x * 100))
-        print('Categories: %s' % sum)
+                    somma[c] += float(nutritionValues[f, c]) * buy[f].x
+                print('%s %g gr.' % (f, int(buy[f].x * 100)))
+        print('Categories actual: %s' % somma)
+        print('Categories ideal: %s' % idealNutrition)
+        #percentage = (sum(idealNutrition)-sum(somma))/sum(idealNutrition)
+        #print('Difference percentage: %s' % percentage)
 
     else:
         print('No solution')
 
 
 # Risoluzione
+m.Params.LogToConsole = 0
 m.optimize()
-if m.status != GRB.OPTIMAL:
+if m.status == GRB.OPTIMAL:
+    print("Success!")
+    print('\nCost: %g' % m.objVal)
+elif m.status != GRB.OPTIMAL:
+    print("Insuccess...")
     m.feasRelaxS(0, False, False, True)
     m.optimize()
 printSolution()
